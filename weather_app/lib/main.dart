@@ -323,3 +323,84 @@ class _WeatherPageState extends State<WeatherPage> with TickerProviderStateMixin
   }
 }
 
+// Search Bar 
+class _SearchBar extends StatefulWidget {
+  final WeatherTheme theme;
+  final void Function(String) onSearch;
+  const _SearchBar({required this.theme, required this.onSearch});
+  @override State<_SearchBar> createState() => _SearchBarState();
+}
+
+class _SearchBarState extends State<_SearchBar> {
+  final _ctrl = TextEditingController();
+  @override void dispose() { _ctrl.dispose(); super.dispose(); }
+
+  @override
+  Widget build(BuildContext context) {
+    final t = widget.theme;
+    return Container(
+      decoration: BoxDecoration(
+        color: t.card,
+        borderRadius: BorderRadius.circular(50),
+        border: Border.all(color: t.accent.withOpacity(0.28)),
+      ),
+      child: TextField(
+        controller: _ctrl,
+        style: TextStyle(color: t.text),
+        textInputAction: TextInputAction.search,
+        onSubmitted: (v) { if (v.trim().isNotEmpty) widget.onSearch(v.trim()); },
+        decoration: InputDecoration(
+          hintText: 'Search city...',
+          hintStyle: TextStyle(color: t.text.withOpacity(0.38)),
+          prefixIcon: Icon(Icons.search, color: t.accent, size: 20),
+          suffixIcon: IconButton(
+            icon: Icon(Icons.send_rounded, color: t.accent, size: 18),
+            onPressed: () {
+              if (_ctrl.text.trim().isNotEmpty) widget.onSearch(_ctrl.text.trim());
+            },
+          ),
+          border: InputBorder.none,
+          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        ),
+      ),
+    );
+  }
+}
+
+// Condition Banner
+class _ConditionBanner extends StatelessWidget {
+  final WeatherTheme theme;
+  final WeatherData weather;
+  const _ConditionBanner({required this.theme, required this.weather});
+
+  String get _msg => switch (weather.main) {
+        'Clear'        => '✨ Perfect day to be outside!',
+        'Clouds'       => '🌤 Mild and comfortable today.',
+        'Rain'         => '☔ Don\'t forget your umbrella!',
+        'Drizzle'      => '🌦 Light rain — stay dry!',
+        'Thunderstorm' => '⚡ Stay safe and stay inside!',
+        'Snow'         => '☃️ Bundle up — it\'s snowing!',
+        _              => '🌫 Low visibility — drive carefully.',
+      };
+
+  @override
+  Widget build(BuildContext context) => Container(
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 22),
+        decoration: BoxDecoration(
+          color: theme.card,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: theme.accent.withOpacity(0.18)),
+        ),
+        child: Text(
+          _msg,
+          textAlign: TextAlign.center,
+          style: TextStyle(
+            color: theme.text.withOpacity(0.88),
+            fontSize: 15,
+            fontWeight: FontWeight.w500,
+            height: 1.4,
+          ),
+        ),
+      );
+}
