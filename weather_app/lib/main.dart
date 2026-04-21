@@ -118,4 +118,208 @@ class WeatherTheme {
   }
 }
 
+// Weather Page
+class WeatherPage extends StatefulWidget {
+  const WeatherPage({super.key});
+  @override
+  State<WeatherPage> createState() => _WeatherPageState();
+}
+
+class _WeatherPageState extends State<WeatherPage> with TickerProviderStateMixin {
+  static const _apiKey = 'f45c1936387aaad7ac946284d4ee9332';
+
+  WeatherData? _weather;
+  bool _loading = false;
+  String? _error;
+  String _city = 'Jakarta';
+
+  late final AnimationController _fadeCtrl =
+      AnimationController(vsync: this, duration: const Duration(milliseconds: 900));
+  late final AnimationController _pulseCtrl =
+      AnimationController(vsync: this, duration: const Duration(seconds: 3))
+        ..repeat(reverse: true);
+  late final Animation<double> _fadeAnim =
+      CurvedAnimation(parent: _fadeCtrl, curve: Curves.easeIn);
+  late final Animation<double> _pulseAnim =
+      Tween(begin: 0.93, end: 1.07)
+          .animate(CurvedAnimation(parent: _pulseCtrl, curve: Curves.easeInOut));
+
+  @override
+  void initState() { super.initState(); _fetchWeather(); }
+
+  @override
+  void dispose() { _fadeCtrl.dispose(); _pulseCtrl.dispose(); super.dispose(); }
+
+  Future<void> _fetchWeather([String? city]) async {
+    final target = city ?? _city;
+    setState(() { _loading = true; _error = null; });
+    try {
+      final res = await http.get(Uri.parse(
+          'https://api.openweathermap.org/data/2.5/weather'
+          '?q=$target&appid=$_apiKey&units=metric'));
+      if (res.statusCode == 200) {
+        setState(() {
+          _weather = WeatherData.fromJson(jsonDecode(res.body));
+          _city = target;
+          _loading = false;
+        });
+        _fadeCtrl..reset()..forward();
+      } else {
+        setState(() { _error = 'City not found'; _loading = false; });
+      }
+    } catch (_) {
+      setState(() { _error = 'No internet connection'; _loading = false; });
+    }
+  }
+ WeatherTheme get _theme => _weather != null
+      ? WeatherTheme.of(_weather!.main, _weather!.icon)
+      : const WeatherTheme(
+          gradient: [Color(0xFF1E3C72), Color(0xFF2A5298), Color(0xFF4A90E2)],
+          accent: Color(0xFF80D8FF), text: Colors.white,
+          card: Color(0x33FFFFFF), emoji: '🌡️', mood: 'default');
+
+  @override
+  Widget build(BuildContext context) {
+    final t = _theme;
+    return Scaffold(
+      body: AnimatedContainer(
+        duration: const Duration(milliseconds: 900),
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: t.gradientBegin,
+            end: t.gradientEnd,
+            colors: t.gradient,
+          ),
+        ),
+        child: SafeArea(
+          child: _loading
+              ? _loader(t)
+              : _error != null
+                  ? _errorView(t)
+                  : _content(t),
+        ),
+      ),
+    );
+  }
+
+  Widget _loader(WeatherTheme t) => Center(
+        child: Column(mainAxisSize: MainAxisSize.min, children: [
+          CircularProgressIndicator(color: t.accent, strokeWidth: 2),
+          const SizedBox(height: 16),
+          Text('Fetching weather...',
+              style: TextStyle(color: t.text.withOpacity(0.7), fontSize: 15)),
+        ]),
+      );
+
+  Widget _errorView(WeatherTheme t) => Center(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 28),
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 520),
+            child: Column(mainAxisSize: MainAxisSize.min, children: [
+              const Text('😕', style: TextStyle(fontSize: 64)),
+              const SizedBox(height: 12),
+              Text(_error!, style: TextStyle(color: t.text, fontSize: 18)),
+              const SizedBox(height: 24),
+              _SearchBar(theme: t, onSearch: _fetchWeather),
+              const SizedBox(height: 12),
+              TextButton(
+                onPressed: _fetchWeather,
+                child: Text('Try Again', style: TextStyle(color: t.accent)),
+              ),
+            ]),
+          ),
+        ),
+      );
+
+  Widget _content(WeatherTheme t) {
+    final w = _weather!;
+    return FadeTransition(
+      opacity: _fadeAnim,
+      child: LayoutBuilder(builder: (ctx, cx) {
+        final pad = cx.maxWidth < 420 ? 20.0 : 28.0;
+        final cw  = min(cx.maxWidth - pad * 2, 680.0);
+        final ch  = max(0.0, cx.maxHeight - 32.0);
+        final sc  = min((cw / 390).clamp(0.72, 1.25), (ch / 700).clamp(0.72, 1.20));
+
+        return Padding(
+          padding: EdgeInsets.symmetric(horizontal: pad, vertical: 16),
+          child: Center(
+            child: SizedBox(
+              width: cw,
+              height: ch,
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  // Search
+                  _SearchBar(theme: t, onSearch: _fetchWeather),
+
+                  // Location
+                  Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+                    Icon(Icons.location_on_rounded, color: t.accent, size: 18 * sc),
+                    SizedBox(width: 4 * sc),
+                    Flexible(
+                      child: Text(
+                        '${w.city}, ${w.country}',
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: t.text,
+                          fontSize: 20 * sc,
+                          fontWeight: FontWeight.w600,
+                          letterSpacing: 0.5,
+                        ),
+                      ),
+                    ),
+                  ]),
+
+                  // Emoji
+                  ScaleTransition(
+                    scale: _pulseAnim,
+                    child: Text(t.emoji, style: TextStyle(fontSize: 90 * sc)),
+                  ),
+
+                  // Description
+                  Text(
+                    w.description.toUpperCase(),
+                    style: TextStyle(
+                      color: t.text.withOpacity(0.65),
+                      fontSize: 12 * sc,
+                      letterSpacing: 2.5,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+
+                  // Temperature
+                  Column(children: [
+                    Text(
+                      '${w.temp.round()}°',
+                      style: TextStyle(
+                        color: t.text,
+                        fontSize: 88 * sc,
+                        fontWeight: FontWeight.w200,
+                        height: 1,
+                      ),
+                    ),
+                    SizedBox(height: 4 * sc),
+                    Text(
+                      'Feels like ${w.feelsLike.round()}°C',
+                      style: TextStyle(
+                        color: t.text.withOpacity(0.55),
+                        fontSize: 14 * sc,
+                      ),
+                    ),
+                  ]),
+
+                  // Condition tip
+                  _ConditionBanner(theme: t, weather: w),
+                ],
+              ),
+            ),
+          ),
+        );
+      }),
+    );
+  }
+}
 
