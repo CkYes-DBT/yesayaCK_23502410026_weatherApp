@@ -15,4 +15,3 @@ class WeatherApp extends StatelessWidget {
         home: const WeatherPage(),
       );
 }
-
